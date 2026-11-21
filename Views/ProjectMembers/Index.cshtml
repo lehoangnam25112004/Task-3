@@ -1,0 +1,149 @@
+@model ConstructionProjectManagement.ViewModels.ProjectMemberManagementViewModel
+@{
+    ViewData["Title"] = "Thành viên dự án";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h3 mb-1">Thành viên — @Model.Project.Name</h1>
+        <div class="text-muted">Project Manager chính: @(Model.Project.ProjectManager?.FullName ?? "Chưa bổ nhiệm")</div>
+    </div>
+    <a class="btn btn-outline-secondary" asp-controller="Projects" asp-action="Details" asp-route-id="@Model.Project.Id">Chi tiết dự án</a>
+</div>
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+<form asp-action="Add" method="post" class="card card-body mb-4">
+    <input asp-for="NewMember.ProjectId" type="hidden" />
+    <h2 class="h5">Thêm nhân sự hoặc phân công thêm vai trò</h2>
+    <div class="row g-3">
+        <div class="col-md-5">
+            <label asp-for="NewMember.EmployeeId" class="form-label">Hồ sơ nhân viên</label>
+            <select asp-for="NewMember.EmployeeId" class="form-select">
+                <option value="">-- Chọn nhân viên đang hoạt động --</option>
+                @foreach (var employee in Model.AvailableEmployees)
+                {
+                    <option value="@employee.Id">
+                        @employee.EmployeeCode - @employee.User.FullName
+                        @if (!employee.User.IsActive)
+                        {
+                            <text> (tài khoản đăng nhập đang bị vô hiệu hóa)</text>
+                        }
+                    </option>
+                }
+            </select>
+            <span asp-validation-for="NewMember.EmployeeId" class="text-danger"></span>
+        </div>
+        <div class="col-md-7">
+            <span class="form-label d-block">Vai trò trong dự án</span>
+            <div class="row">
+                @foreach (var role in Model.AvailableRoles)
+                {
+                    var inputId = $"role-{role.Code}";
+                    <div class="col-sm-6 form-check ms-2">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               name="NewMember.RoleCodes"
+                               id="@inputId"
+                               value="@role.Code"
+                               checked="@Model.NewMember.RoleCodes.Contains(role.Code)" />
+                        <label class="form-check-label" for="@inputId">
+                            @role.Name
+                            @if (role.MaximumConcurrentProjects is int maximum)
+                            {
+                                <span class="text-muted">(tối đa @maximum dự án đồng thời)</span>
+                            }
+                        </label>
+                    </div>
+                }
+            </div>
+            <span asp-validation-for="NewMember.RoleCodes" class="text-danger"></span>
+        </div>
+    </div>
+    @if (Model.AvailableEmployees.Count == 0)
+    {
+        <div class="text-muted mt-3">Không có hồ sơ nhân viên đang hoạt động phù hợp để thêm.</div>
+    }
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary" disabled="@(Model.AvailableEmployees.Count == 0)">Lưu phân công</button>
+    </div>
+</form>
+
+<h2 class="h5 mb-3">Danh sách thành viên và lịch sử vai trò</h2>
+@if (Model.Project.Members.Count == 0)
+{
+    <div class="alert alert-info">Dự án chưa có thành viên.</div>
+}
+else
+{
+    <div class="accordion" id="projectMembers">
+        @foreach (var member in Model.Project.Members.OrderBy(item => item.Employee?.EmployeeCode))
+        {
+            var memberKey = $"member-{member.Id}";
+            <div class="accordion-item">
+                <h3 class="accordion-header" id="heading-@memberKey">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#body-@memberKey">
+                        @(member.Employee?.EmployeeCode ?? "Chưa liên kết Employee") — @member.User.FullName
+                        <span class="badge ms-2 @(member.IsActive ? "text-bg-success" : "text-bg-secondary")">
+                            @(member.IsActive ? "Đang tham gia" : "Đã kết thúc")
+                        </span>
+                    </button>
+                </h3>
+                <div id="body-@memberKey" class="accordion-collapse collapse" data-bs-parent="#projectMembers">
+                    <div class="accordion-body">
+                        @if (!string.IsNullOrWhiteSpace(member.AssignmentRole))
+                        {
+                            <div class="text-muted mb-2">Vai trò legacy chưa chuẩn hóa: @member.AssignmentRole</div>
+                        }
+                        <div class="mb-2">Ngày tham gia: @member.JoinedAt.ToString("dd/MM/yyyy")</div>
+                        @if (member.RoleAssignments.Count == 0)
+                        {
+                            <div class="text-muted">Chưa có lịch sử phân công vai trò.</div>
+                        }
+                        <ul class="list-group mb-3">
+                            @foreach (var assignment in member.RoleAssignments.OrderByDescending(item => item.StartedAt))
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>
+                                        @assignment.ProjectRole.Name —
+                                        @assignment.StartedAt.ToString("dd/MM/yyyy HH:mm")
+                                        đến @(assignment.EndedAt?.ToString("dd/MM/yyyy HH:mm") ?? "hiện tại")
+                                    </span>
+                                    @if (assignment.EndedAt is null)
+                                    {
+                                        <form asp-action="EndRole" method="post" class="ms-2">
+                                            <input type="hidden" name="projectId" value="@Model.Project.Id" />
+                                            <input type="hidden" name="memberId" value="@member.Id" />
+                                            <input type="hidden" name="assignmentId" value="@assignment.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-warning">Kết thúc vai trò</button>
+                                        </form>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                        @if (member.IsActive)
+                        {
+                            <form asp-action="EndMembership" method="post">
+                                <input type="hidden" name="projectId" value="@Model.Project.Id" />
+                                <input type="hidden" name="memberId" value="@member.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Kết thúc toàn bộ tham gia</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

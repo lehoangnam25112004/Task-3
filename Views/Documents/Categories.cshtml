@@ -1,0 +1,57 @@
+@model IReadOnlyCollection<ConstructionProjectManagement.Models.DocumentCategory>
+@{
+    ViewData["Title"] = "Danh mục tài liệu";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <a asp-action="Index" class="text-decoration-none">&larr; Quản lý tài liệu</a>
+        <h1 class="h3 mb-0 mt-1">Danh mục tài liệu</h1>
+    </div>
+    <a class="btn btn-primary" asp-action="CreateCategory">Thêm danh mục</a>
+</div>
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Mã</th><th>Tên</th><th>Cấp duyệt</th><th>Định dạng cho phép</th><th>Trạng thái</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var category in Model)
+            {
+                <tr>
+                    <td>@category.Code</td>
+                    <td>
+                        <div class="fw-semibold">@category.Name</div>
+                        @if (!string.IsNullOrWhiteSpace(category.Description))
+                        {
+                            <div class="small text-muted">@category.Description</div>
+                        }
+                    </td>
+                    <td>@(category.ApprovalLevels == 0 ? "Không yêu cầu" : $"{category.ApprovalLevels} cấp")</td>
+                    <td>@(category.AllowedExtensions ?? "Mặc định")</td>
+                    <td>@(category.IsActive ? "Đang hoạt động" : "Đã ngừng")</td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="EditCategory" asp-route-id="@category.Id">Sửa</a>
+                        <form asp-action="SetCategoryActive" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@category.Id" />
+                            <input type="hidden" name="isActive" value="@(!category.IsActive)" />
+                            <button class="btn btn-sm btn-outline-secondary" type="submit">
+                                @(category.IsActive ? "Ngừng" : "Kích hoạt")
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,75 @@
+@model ConstructionProjectManagement.ViewModels.ContractListViewModel
+@using ConstructionProjectManagement.Models
+@{
+    ViewData["Title"] = "Hợp đồng";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3">Hợp đồng dự án</h1>
+    @if (User.IsInRole("Project Director") || User.IsInRole("Project Manager"))
+    {
+        <a class="btn btn-primary" asp-action="Create">Tạo hợp đồng</a>
+    }
+</div>
+
+<form method="get" class="card card-body mb-3">
+    <div class="row g-2">
+        <div class="col-md-3"><input class="form-control" name="keyword" value="@Model.Keyword" placeholder="Tìm mã hoặc tên hợp đồng" /></div>
+        <div class="col-md-2"><select asp-for="Status" asp-items="Html.GetEnumSelectList<ContractStatus>()" class="form-select"><option value="">Tất cả trạng thái</option></select></div>
+        <div class="col-md-2"><select asp-for="ContractType" asp-items="Html.GetEnumSelectList<ContractType>()" class="form-select"><option value="">Tất cả loại hợp đồng</option></select></div>
+        <div class="col-md-3">
+            <div class="form-check pt-2">
+                <input asp-for="ShowArchived" class="form-check-input" />
+                <label asp-for="ShowArchived" class="form-check-label">Hiện hợp đồng đã lưu trữ</label>
+            </div>
+        </div>
+        <div class="col-md-2"><button class="btn btn-primary w-100">Lọc</button></div>
+    </div>
+</form>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Số hợp đồng</th>
+                    <th>Dự án</th>
+                    <th>Giá trị</th>
+                    <th>Ngày hiệu lực</th>
+                    <th>Trạng thái</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var contract in Model.Contracts)
+            {
+                <tr class="@(contract.IsArchived ? "table-secondary" : null)">
+                    <td>@contract.ContractNumber</td>
+                    <td>@string.Join(", ", contract.ContractProjects.Select(item => item.Project.ProjectCode))</td>
+                    <td>@contract.CurrentValue.ToString("N0")</td>
+                    <td>@contract.EffectiveDate?.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        @contract.Status
+                        @if (contract.IsArchived)
+                        {
+                            <span class="badge text-bg-dark ms-1">Đã lưu trữ</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@contract.Id">Chi tiết</a>
+                        @if (contract.IsArchived &&
+                             (User.IsInRole("Admin") || User.IsInRole("Project Director") || User.IsInRole("Project Manager")))
+                        {
+                            <form asp-action="Restore" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@contract.Id" />
+                                <button class="btn btn-sm btn-outline-success">Khôi phục</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

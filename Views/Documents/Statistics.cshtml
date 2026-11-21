@@ -1,0 +1,105 @@
+@model IReadOnlyCollection<ConstructionProjectManagement.Models.ProjectDocument>
+@{
+    ViewData["Title"] = "Thống kê tài liệu";
+    var byStatus = ViewBag.ByStatus as IReadOnlyDictionary<string, int> ?? new Dictionary<string, int>();
+    var byCategory = ViewBag.ByCategory as IReadOnlyDictionary<string, int> ?? new Dictionary<string, int>();
+    var byProject = ViewBag.ByProject as IReadOnlyDictionary<string, int> ?? new Dictionary<string, int>();
+    var byMonth = ViewBag.ByMonth as IReadOnlyDictionary<string, int> ?? new Dictionary<string, int>();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <a asp-action="Index" class="text-decoration-none">&larr; Quản lý tài liệu</a>
+        <h1 class="h3 mb-0 mt-1">Thống kê tài liệu</h1>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="ExportStatisticsExcel" class="btn btn-outline-success">Xuất Excel</a>
+        <a asp-action="ExportStatisticsPdf" class="btn btn-outline-danger">Xuất PDF</a>
+    </div>
+</div>
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card card-body h-100">
+            <div class="text-muted">Tổng tài liệu</div>
+            <div class="display-6">@ViewBag.TotalFiles</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-body h-100">
+            <div class="text-muted">Dung lượng hiện tại</div>
+            <div class="display-6">@($"{(long)ViewBag.TotalBytes / (1024d * 1024d):N1}") <small class="fs-6">MB</small></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-body h-100">
+            <div class="text-muted">Danh mục</div>
+            <div class="display-6">@byCategory.Count</div>
+        </div>
+    </div>
+</div>
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header fw-semibold">Theo trạng thái</div>
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead><tr><th>Trạng thái</th><th class="text-end">Số lượng</th></tr></thead>
+                    <tbody>
+                    @foreach (var entry in byStatus.OrderBy(item => item.Key))
+                    {
+                        <tr><td>@entry.Key</td><td class="text-end">@entry.Value</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header fw-semibold">Theo danh mục</div>
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead><tr><th>Danh mục</th><th class="text-end">Số lượng</th></tr></thead>
+                    <tbody>
+                    @foreach (var entry in byCategory.OrderBy(item => item.Key))
+                    {
+                        <tr><td>@entry.Key</td><td class="text-end">@entry.Value</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header fw-semibold">Theo dự án</div>
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead><tr><th>Dự án</th><th class="text-end">Số lượng</th></tr></thead>
+                        <tbody>
+                        @foreach (var entry in byProject.OrderBy(item => item.Key))
+                        {
+                            <tr><td>@entry.Key</td><td class="text-end">@entry.Value</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header fw-semibold">Theo tháng tải lên</div>
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead><tr><th>Tháng</th><th class="text-end">Số lượng</th></tr></thead>
+                        <tbody>
+                        @foreach (var entry in byMonth.OrderBy(item => item.Key))
+                        {
+                            <tr><td>@entry.Key</td><td class="text-end">@entry.Value</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

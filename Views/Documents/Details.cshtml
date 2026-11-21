@@ -1,0 +1,261 @@
+@model ConstructionProjectManagement.ViewModels.DocumentDetailsViewModel
+@{
+    ViewData["Title"] = "Chi tiết tài liệu";
+    var document = Model.Document;
+    var previewable = document.ContentType is "application/pdf" or "image/png" or "image/jpeg";
+    string StatusName(DocumentApprovalStatus status) => status switch
+    {
+        DocumentApprovalStatus.Draft => "Bản nháp",
+        DocumentApprovalStatus.PendingReview => "Chờ kiểm tra cấp 1",
+        DocumentApprovalStatus.PendingApproval => "Chờ phê duyệt",
+        DocumentApprovalStatus.Approved => "Đã phê duyệt",
+        DocumentApprovalStatus.Rejected => "Bị từ chối",
+        _ => status.ToString()
+    };
+    string ActionName(string action) => action switch
+    {
+        "Created" => "Tạo tài liệu",
+        "MetadataUpdated" => "Cập nhật thông tin",
+        "VersionUploaded" => "Tải phiên bản mới",
+        "Submitted" => "Gửi duyệt",
+        "Resubmitted" => "Gửi duyệt lại",
+        "ApprovedStep1" => "Thông qua bước kiểm tra cấp 1",
+        "ApprovedFinal" => "Phê duyệt cuối",
+        "Reviewed" => "Kiểm tra cấp 1",
+        "Approved" => "Phê duyệt",
+        "Rejected" => "Từ chối",
+        "Archived" => "Lưu trữ",
+        "Restored" => "Khôi phục",
+        "Downloaded" => "Tải xuống",
+        "Previewed" => "Xem trước",
+        _ => action
+    };
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <a asp-action="Index" class="text-decoration-none">&larr; Danh sách tài liệu</a>
+        <h1 class="h3 mb-0 mt-1">@document.Title</h1>
+        <span class="text-muted">@document.DocumentCode</span>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        @if (Model.Permissions.CanDownload)
+        {
+            <a class="btn btn-outline-primary" asp-action="Download" asp-route-id="@document.Id">Tải xuống</a>
+            @if (previewable)
+            {
+                <a class="btn btn-outline-secondary" asp-action="Preview" asp-route-id="@document.Id" target="_blank" rel="noopener">Xem trước</a>
+            }
+        }
+        @if (Model.Permissions.CanEdit)
+        {
+            <a class="btn btn-primary" asp-action="Edit" asp-route-id="@document.Id">Sửa / phiên bản mới</a>
+        }
+        @if (Model.Permissions.CanSubmit)
+        {
+            <form asp-action="Submit" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@document.Id" />
+                <button class="btn btn-outline-primary" type="submit">Gửi duyệt</button>
+            </form>
+        }
+        @if (Model.Permissions.CanReview)
+        {
+            <form asp-action="Review" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@document.Id" />
+                <button class="btn btn-outline-success" type="submit">Thông qua cấp 1</button>
+            </form>
+        }
+        @if (Model.Permissions.CanApprove)
+        {
+            <form asp-action="Approve" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@document.Id" />
+                <button class="btn btn-success" type="submit">Phê duyệt</button>
+            </form>
+        }
+        @if (Model.Permissions.CanReview || Model.Permissions.CanApprove)
+        {
+            <form asp-action="Reject" method="post" class="d-flex gap-1">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@document.Id" />
+                <input class="form-control form-control-sm" name="reason" maxlength="1000" required placeholder="Lý do từ chối" />
+                <button class="btn btn-outline-danger btn-sm" type="submit">Từ chối</button>
+            </form>
+        }
+        @if (Model.Permissions.CanArchive)
+        {
+            <form asp-action="Archive" method="post" class="d-flex gap-1" onsubmit="return confirm('Lưu trữ tài liệu này?')">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@document.Id" />
+                <input class="form-control form-control-sm" name="reason" maxlength="500" required placeholder="Lý do lưu trữ" />
+                <button class="btn btn-outline-danger" type="submit">Lưu trữ</button>
+            </form>
+        }
+        @if (Model.Permissions.CanRestore)
+        {
+            <form asp-action="Restore" method="post" onsubmit="return confirm('Khôi phục tài liệu này?')">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@document.Id" />
+                <button class="btn btn-success" type="submit">Khôi phục</button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+@if (document.IsArchived)
+{
+    <div class="alert alert-warning">
+        Tài liệu đã lưu trữ lúc @(document.ArchivedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "không rõ").
+        @if (!string.IsNullOrWhiteSpace(document.ArchiveReason))
+        {
+            <span>Lý do: @document.ArchiveReason</span>
+        }
+    </div>
+}
+@if (!previewable && (document.ContentType.StartsWith("application/ms") ||
+    document.ContentType.StartsWith("application/vnd.openxmlformats-officedocument")))
+{
+    <div class="alert alert-info">
+        Trình duyệt không hỗ trợ xem trực tiếp định dạng Office. Hãy tải tệp xuống để xem nội dung.
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-xl-7">
+        <div class="card">
+            <div class="card-header fw-semibold">Thông tin tài liệu</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Danh mục</dt>
+                    <dd class="col-sm-8">@(document.CategoryEntity?.Name ?? document.Category)</dd>
+                    <dt class="col-sm-4">Dự án</dt>
+                    <dd class="col-sm-8">@(document.Project?.Name ?? (document.IsSystemWide ? "Toàn hệ thống" : "—"))</dd>
+                    @if (document.Contract is not null)
+                    {
+                        <dt class="col-sm-4">Hợp đồng</dt>
+                        <dd class="col-sm-8">@document.Contract.ContractNumber - @document.Contract.Title</dd>
+                    }
+                    @if (document.Amendment is not null)
+                    {
+                        <dt class="col-sm-4">Phụ lục</dt>
+                        <dd class="col-sm-8">@document.Amendment.AmendmentNumber - @document.Amendment.Title</dd>
+                    }
+                    <dt class="col-sm-4">Tệp hiện tại</dt>
+                    <dd class="col-sm-8">@document.FileName</dd>
+                    <dt class="col-sm-4">Phiên bản</dt>
+                    <dd class="col-sm-8">v@(document.CurrentVersionNumber)</dd>
+                    <dt class="col-sm-4">Trạng thái</dt>
+                    <dd class="col-sm-8">@StatusName(document.ApprovalStatus)</dd>
+                    <dt class="col-sm-4">Người tải lên</dt>
+                    <dd class="col-sm-8">@(document.UploadedBy?.FullName ?? document.UploadedBy?.UserName ?? document.UploadedById)</dd>
+                    <dt class="col-sm-4">Ngày tạo</dt>
+                    <dd class="col-sm-8">@document.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd>
+                    @if (!string.IsNullOrWhiteSpace(document.Description))
+                    {
+                        <dt class="col-sm-4">Mô tả</dt>
+                        <dd class="col-sm-8">@document.Description</dd>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(document.RejectionReason))
+                    {
+                        <dt class="col-sm-4">Lý do từ chối</dt>
+                        <dd class="col-sm-8 text-danger">@document.RejectionReason</dd>
+                    }
+                    @if (document.EditLock is { IsReleased: false } editLock && editLock.ExpiresAt > DateTime.UtcNow)
+                    {
+                        <dt class="col-sm-4">Khóa chỉnh sửa</dt>
+                        <dd class="col-sm-8">
+                            @editLock.LockedByDisplayName đến @editLock.ExpiresAt.ToLocalTime().ToString("HH:mm")
+                        </dd>
+                    }
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-5">
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Lịch sử phiên bản</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Phiên bản</th><th>Tệp</th><th>Trạng thái</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var version in Model.Versions)
+                    {
+                        <tr>
+                            <td>v@(version.VersionNumber) @(version.IsCurrent ? "(hiện tại)" : "")</td>
+                            <td>
+                                @version.OriginalFileName
+                                <div class="small text-muted">@version.UploadedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                            </td>
+                            <td>@StatusName(version.ApprovalStatus)</td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Download" asp-route-id="@document.Id" asp-route-version="@version.VersionNumber">Tải</a>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header fw-semibold">Lịch sử phê duyệt</div>
+            <div class="list-group list-group-flush">
+                @if (Model.ApprovalLogs.Count == 0)
+                {
+                    <div class="list-group-item text-muted">Chưa có hoạt động phê duyệt.</div>
+                }
+                @foreach (var log in Model.ApprovalLogs)
+                {
+                    <div class="list-group-item">
+                        <div class="fw-semibold">@ActionName(log.Action)</div>
+                        <div class="small text-muted">
+                            Bước @log.StepNumber · @(log.Actor?.FullName ?? log.Actor?.UserName ?? log.ActorUserId) ·
+                            @log.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(log.CommentOrReason))
+                        {
+                            <div>@log.CommentOrReason</div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header fw-semibold">Lịch sử thao tác (chỉ đọc)</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Thời gian</th><th>Thao tác</th><th>Người thực hiện</th><th>Ghi chú</th></tr></thead>
+                    <tbody>
+                    @if (Model.AuditLogs.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-muted">Chưa có lịch sử.</td></tr>
+                    }
+                    @foreach (var log in Model.AuditLogs)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@log.PerformedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</td>
+                            <td>@ActionName(log.Action)</td>
+                            <td>@log.ActorDisplayName <span class="text-muted">(@log.ActorRole)</span></td>
+                            <td>@(log.Reason ?? log.Comment ?? "—")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

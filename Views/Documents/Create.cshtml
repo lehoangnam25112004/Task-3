@@ -1,0 +1,198 @@
+@model ConstructionProjectManagement.ViewModels.DocumentCreateViewModel
+@{
+    ViewData["Title"] = "Tạo tài liệu";
+}
+
+<div class="mb-3">
+    <a asp-action="Index" class="text-decoration-none">&larr; Danh sách tài liệu</a>
+    <h1 class="h3 mt-1">Tạo tài liệu</h1>
+    <p class="text-muted mb-0">Mỗi tệp được lưu thành một tài liệu riêng. Cho phép PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, JPG/JPEG, PNG tối đa 25 MB mỗi tệp.</p>
+</div>
+
+<form asp-action="Create" method="post" enctype="multipart/form-data">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">Phạm vi và liên kết</div>
+        <div class="card-body">
+            @if (Model.CanCreateSystemWide)
+            {
+                <div class="form-check mb-3">
+                    <input asp-for="IsSystemWide" class="form-check-input" id="isSystemWide" />
+                    <label asp-for="IsSystemWide" class="form-check-label">Tài liệu dùng chung toàn hệ thống</label>
+                </div>
+            }
+            <div class="row g-3">
+                <div class="col-md-4" id="projectField">
+                    <label asp-for="ProjectId" class="form-label">Dự án</label>
+                    <select asp-for="ProjectId" class="form-select" id="projectId">
+                        <option value="">-- Chọn dự án --</option>
+                        @foreach (var project in Model.Projects)
+                        {
+                            <option value="@project.Id">@project.ProjectCode - @project.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="ContractId" class="form-label">Hợp đồng liên quan (không bắt buộc)</label>
+                    <select asp-for="ContractId" class="form-select" id="contractId">
+                        <option value="">-- Không liên kết hợp đồng --</option>
+                        @foreach (var contract in Model.Contracts)
+                        {
+                            <option value="@contract.Id">@contract.ContractNumber - @contract.Title</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="AmendmentId" class="form-label">Phụ lục liên quan (không bắt buộc)</label>
+                    <select asp-for="AmendmentId" class="form-select" id="amendmentId">
+                        <option value="">-- Không liên kết phụ lục --</option>
+                        @foreach (var amendment in Model.Amendments)
+                        {
+                            <option value="@amendment.Id" data-contract-id="@amendment.ContractId">@amendment.AmendmentNumber - @amendment.Title</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h5 mb-0">Tệp tài liệu</h2>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="addFileRow">Thêm tệp</button>
+    </div>
+
+    <div id="fileRows">
+        @for (var index = 0; index < Model.Files.Count; index++)
+        {
+            <div class="card mb-3 document-file-row">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Tài liệu @(index + 1)</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-file-row">Bỏ tệp</button>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-lg-4">
+                            <label asp-for="Files[index].File" class="form-label">Tệp</label>
+                            <input asp-for="Files[index].File" class="form-control" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png" />
+                            <span asp-validation-for="Files[index].File" class="text-danger"></span>
+                        </div>
+                        <div class="col-lg-4">
+                            <label asp-for="Files[index].Title" class="form-label">Tiêu đề</label>
+                            <input asp-for="Files[index].Title" class="form-control" />
+                            <span asp-validation-for="Files[index].Title" class="text-danger"></span>
+                        </div>
+                        <div class="col-lg-4">
+                            <label asp-for="Files[index].CategoryId" class="form-label">Danh mục</label>
+                            <select asp-for="Files[index].CategoryId" class="form-select">
+                                <option value="">-- Chọn danh mục --</option>
+                                @foreach (var category in Model.Categories)
+                                {
+                                    <option value="@category.Id">@category.Name · @category.ApprovalLevels cấp duyệt</option>
+                                }
+                            </select>
+                            <span asp-validation-for="Files[index].CategoryId" class="text-danger"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Files[index].Description" class="form-label">Mô tả (không bắt buộc)</label>
+                            <textarea asp-for="Files[index].Description" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <template id="fileRowTemplate">
+        <div class="card mb-3 document-file-row">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Tệp mới</span>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-file-row">Bỏ tệp</button>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <label class="form-label" for="Files___index___File">Tệp</label>
+                        <input class="form-control" type="file" id="Files___index___File" name="Files[__index__].File" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png" required />
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label" for="Files___index___Title">Tiêu đề</label>
+                        <input class="form-control" type="text" id="Files___index___Title" name="Files[__index__].Title" maxlength="250" required />
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label" for="Files___index___CategoryId">Danh mục</label>
+                        <select class="form-select" id="Files___index___CategoryId" name="Files[__index__].CategoryId" required>
+                            <option value="">-- Chọn danh mục --</option>
+                            @foreach (var category in Model.Categories)
+                            {
+                                <option value="@category.Id">@category.Name · @category.ApprovalLevels cấp duyệt</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="Files___index___Description">Mô tả (không bắt buộc)</label>
+                        <textarea class="form-control" id="Files___index___Description" name="Files[__index__].Description" maxlength="2000" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Tạo tài liệu</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Hủy</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const rows = document.getElementById("fileRows");
+            const template = document.getElementById("fileRowTemplate");
+            let nextIndex = @Model.Files.Count;
+
+            document.getElementById("addFileRow").addEventListener("click", () => {
+                const html = template.innerHTML.replace(/__index__/g, String(nextIndex++));
+                rows.insertAdjacentHTML("beforeend", html);
+            });
+
+            rows.addEventListener("click", event => {
+                if (!event.target.classList.contains("remove-file-row")) return;
+                const fileRows = rows.querySelectorAll(".document-file-row");
+                if (fileRows.length <= 1) return;
+                event.target.closest(".document-file-row").remove();
+            });
+
+            const toggleProjectField = () => {
+                const systemWide = document.getElementById("isSystemWide");
+                const projectField = document.getElementById("projectField");
+                if (systemWide && projectField) {
+                    projectField.hidden = systemWide.checked;
+                    if (systemWide.checked) {
+                        document.getElementById("projectId").value = "";
+                        document.getElementById("contractId").value = "";
+                        document.getElementById("amendmentId").value = "";
+                    }
+                }
+            };
+            const systemWide = document.getElementById("isSystemWide");
+            if (systemWide) {
+                systemWide.addEventListener("change", toggleProjectField);
+                toggleProjectField();
+            }
+
+            const contract = document.getElementById("contractId");
+            const amendment = document.getElementById("amendmentId");
+            const filterAmendments = () => {
+                for (const option of amendment.options) {
+                    if (!option.dataset.contractId) continue;
+                    option.hidden = option.dataset.contractId !== contract.value;
+                    if (option.hidden && option.selected) amendment.value = "";
+                }
+            };
+            contract.addEventListener("change", filterAmendments);
+            filterAmendments();
+        })();
+    </script>
+}

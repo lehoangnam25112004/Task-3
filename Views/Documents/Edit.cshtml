@@ -1,0 +1,141 @@
+@model ConstructionProjectManagement.ViewModels.DocumentEditViewModel
+@{
+    ViewData["Title"] = "Sửa tài liệu";
+}
+
+<div class="mb-3">
+    <a asp-action="Details" asp-route-id="@Model.Id" class="text-decoration-none">&larr; Chi tiết tài liệu</a>
+    <h1 class="h3 mt-1">Cập nhật tài liệu</h1>
+    @if (Model.EditLock is not null)
+    {
+        <p class="text-muted mb-0">Khóa chỉnh sửa của bạn có hiệu lực đến @Model.EditLock.ExpiresAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm").</p>
+    }
+</div>
+
+<div class="card mb-3">
+    <div class="card-header fw-semibold">Thông tin tài liệu</div>
+    <div class="card-body">
+        <form asp-action="Edit" method="post">
+            @Html.AntiForgeryToken()
+            <input asp-for="Id" type="hidden" />
+            @if (!User.IsInRole("Admin"))
+            {
+                <input asp-for="IsSystemWide" type="hidden" />
+            }
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Title" class="form-label">Tiêu đề</label>
+                    <input asp-for="Title" class="form-control" />
+                    <span asp-validation-for="Title" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="CategoryId" class="form-label">Danh mục</label>
+                    <select asp-for="CategoryId" class="form-select">
+                        @foreach (var category in Model.Categories)
+                        {
+                            <option value="@category.Id">@category.Name@(category.IsActive ? "" : " (đã ngừng)")</option>
+                        }
+                    </select>
+                    <span asp-validation-for="CategoryId" class="text-danger"></span>
+                </div>
+                @if (User.IsInRole("Admin"))
+                {
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input asp-for="IsSystemWide" class="form-check-input" />
+                            <label asp-for="IsSystemWide" class="form-check-label">Tài liệu dùng chung toàn hệ thống</label>
+                        </div>
+                    </div>
+                }
+                <div class="col-md-6">
+                    <label asp-for="ProjectId" class="form-label">Dự án</label>
+                    <select asp-for="ProjectId" class="form-select">
+                        <option value="">-- Chọn dự án --</option>
+                        @foreach (var project in Model.Projects)
+                        {
+                            <option value="@project.Id">@project.ProjectCode - @project.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="ContractId" class="form-label">Hợp đồng liên quan</label>
+                    <select asp-for="ContractId" class="form-select" id="contractId">
+                        <option value="">-- Không liên kết hợp đồng --</option>
+                        @foreach (var contract in Model.Contracts)
+                        {
+                            <option value="@contract.Id">@contract.ContractNumber - @contract.Title</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="AmendmentId" class="form-label">Phụ lục liên quan</label>
+                    <select asp-for="AmendmentId" class="form-select" id="amendmentId">
+                        <option value="">-- Không liên kết phụ lục --</option>
+                        @foreach (var amendment in Model.Amendments)
+                        {
+                            <option value="@amendment.Id" data-contract-id="@amendment.ContractId">@amendment.AmendmentNumber - @amendment.Title</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Description" class="form-label">Mô tả</label>
+                    <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-primary">Lưu thông tin</button>
+                <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Quay lại</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header fw-semibold">Tạo phiên bản mới</div>
+    <div class="card-body">
+        <p class="text-muted">Tải tệp mới sẽ tạo một phiên bản riêng; chỉ thay đổi thông tin ở trên không làm tăng phiên bản.</p>
+        <form asp-action="UploadVersion" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label for="file" class="form-label">Tệp phiên bản mới</label>
+                    <input class="form-control" type="file" id="file" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png" required />
+                </div>
+                <div class="col-md-5">
+                    <label for="versionNote" class="form-label">Ghi chú thay đổi</label>
+                    <input class="form-control" type="text" id="versionNote" name="versionNote" maxlength="1000" />
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-primary w-100" type="submit">Tải phiên bản</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form asp-action="ReleaseLock" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" value="@Model.Id" />
+    <button class="btn btn-outline-warning" type="submit">Hủy sửa và nhả khóa</button>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const contract = document.getElementById("contractId");
+            const amendment = document.getElementById("amendmentId");
+            const filterAmendments = () => {
+                for (const option of amendment.options) {
+                    if (!option.dataset.contractId) continue;
+                    option.hidden = option.dataset.contractId !== contract.value;
+                    if (option.hidden && option.selected) amendment.value = "";
+                }
+            };
+            contract.addEventListener("change", filterAmendments);
+            filterAmendments();
+        })();
+    </script>
+}

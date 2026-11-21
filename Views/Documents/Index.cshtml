@@ -1,0 +1,281 @@
+@model ConstructionProjectManagement.ViewModels.DocumentListViewModel
+@{
+    ViewData["Title"] = "Quản lý tài liệu";
+    string StatusName(DocumentApprovalStatus status) => status switch
+    {
+        DocumentApprovalStatus.Draft => "Bản nháp",
+        DocumentApprovalStatus.PendingReview => "Chờ kiểm tra cấp 1",
+        DocumentApprovalStatus.PendingApproval => "Chờ phê duyệt",
+        DocumentApprovalStatus.Approved => "Đã phê duyệt",
+        DocumentApprovalStatus.Rejected => "Bị từ chối",
+        _ => status.ToString()
+    };
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Quản lý tài liệu</h1>
+    <div class="d-flex gap-2">
+        @if (Model.CanCreate)
+        {
+            <a class="btn btn-primary" asp-action="Create">Tạo tài liệu</a>
+        }
+        @if (User.IsInRole("Admin"))
+        {
+            <a class="btn btn-outline-secondary" asp-action="Categories">Danh mục</a>
+        }
+        @if (Model.CanExport)
+        {
+            <a class="btn btn-outline-info" asp-action="Statistics">Thống kê</a>
+        }
+        @if (Model.CanExport)
+        {
+            <a class="btn btn-outline-success"
+               asp-action="ExportExcel"
+               asp-route-keyword="@Model.Keyword"
+               asp-route-projectId="@Model.ProjectId"
+               asp-route-categoryId="@Model.CategoryId"
+               asp-route-contractId="@Model.ContractId"
+               asp-route-approvalStatus="@Model.ApprovalStatus"
+               asp-route-uploadedById="@Model.UploadedById"
+               asp-route-uploadedFrom="@Model.UploadedFrom?.ToString("yyyy-MM-dd")"
+               asp-route-uploadedTo="@Model.UploadedTo?.ToString("yyyy-MM-dd")"
+               asp-route-showArchived="@Model.ShowArchived">Xuất Excel</a>
+            <a class="btn btn-outline-danger"
+               asp-action="ExportPdf"
+               asp-route-keyword="@Model.Keyword"
+               asp-route-projectId="@Model.ProjectId"
+               asp-route-categoryId="@Model.CategoryId"
+               asp-route-contractId="@Model.ContractId"
+               asp-route-approvalStatus="@Model.ApprovalStatus"
+               asp-route-uploadedById="@Model.UploadedById"
+               asp-route-uploadedFrom="@Model.UploadedFrom?.ToString("yyyy-MM-dd")"
+               asp-route-uploadedTo="@Model.UploadedTo?.ToString("yyyy-MM-dd")"
+               asp-route-showArchived="@Model.ShowArchived">Xuất PDF</a>
+        }
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (Model.ShowArchived)
+{
+    <div class="alert alert-warning">Đang xem tài liệu đã lưu trữ. Tài liệu này không xuất hiện trong danh sách hoạt động.</div>
+}
+
+<form method="get" asp-action="Index" class="card card-body mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-6 col-xl-3">
+            <label for="keyword" class="form-label">Từ khóa</label>
+            <input id="keyword" name="Keyword" value="@Model.Keyword" class="form-control" placeholder="Mã, tiêu đề hoặc mô tả" />
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <label for="projectId" class="form-label">Dự án</label>
+            <select id="projectId" name="ProjectId" class="form-select">
+                <option value="">Tất cả dự án</option>
+                @foreach (var project in Model.Projects)
+                {
+                    if (Model.ProjectId == project.Id)
+                    {
+                        <option value="@project.Id" selected>@project.ProjectCode - @project.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@project.Id">@project.ProjectCode - @project.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <label for="contractId" class="form-label">Hợp đồng</label>
+            <select id="contractId" name="ContractId" class="form-select">
+                <option value="">Tất cả hợp đồng</option>
+                @foreach (var contract in Model.Contracts)
+                {
+                    if (Model.ContractId == contract.Id)
+                    {
+                        <option value="@contract.Id" selected>@contract.ContractNumber - @contract.Title</option>
+                    }
+                    else
+                    {
+                        <option value="@contract.Id">@contract.ContractNumber - @contract.Title</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <label for="categoryId" class="form-label">Danh mục</label>
+            <select id="categoryId" name="CategoryId" class="form-select">
+                <option value="">Tất cả danh mục</option>
+                @foreach (var category in Model.Categories)
+                {
+                    if (Model.CategoryId == category.Id)
+                    {
+                        <option value="@category.Id" selected>@category.Name@(category.IsActive ? "" : " (đã ngừng)")</option>
+                    }
+                    else
+                    {
+                        <option value="@category.Id">@category.Name@(category.IsActive ? "" : " (đã ngừng)")</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <label for="approvalStatus" class="form-label">Trạng thái</label>
+            <select id="approvalStatus" name="ApprovalStatus" class="form-select">
+                <option value="">Tất cả trạng thái</option>
+                @foreach (var status in Enum.GetValues<DocumentApprovalStatus>())
+                {
+                    if (Model.ApprovalStatus == status)
+                    {
+                        <option value="@status" selected>@StatusName(status)</option>
+                    }
+                    else
+                    {
+                        <option value="@status">@StatusName(status)</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <label for="uploadedById" class="form-label">Người tải lên</label>
+            <select id="uploadedById" name="UploadedById" class="form-select">
+                <option value="">Tất cả người tải</option>
+                @foreach (var uploader in Model.Uploaders)
+                {
+                    var displayName = string.IsNullOrWhiteSpace(uploader.FullName) ? uploader.UserName : uploader.FullName;
+                    if (Model.UploadedById == uploader.Id)
+                    {
+                        <option value="@uploader.Id" selected>@displayName</option>
+                    }
+                    else
+                    {
+                        <option value="@uploader.Id">@displayName</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <label for="uploadedFrom" class="form-label">Tải lên từ ngày</label>
+            <input id="uploadedFrom" name="UploadedFrom" type="date" value="@Model.UploadedFrom?.ToString("yyyy-MM-dd")" class="form-control" />
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <label for="uploadedTo" class="form-label">Đến ngày</label>
+            <input id="uploadedTo" name="UploadedTo" type="date" value="@Model.UploadedTo?.ToString("yyyy-MM-dd")" class="form-control" />
+        </div>
+        @if (User.IsInRole("Admin") || User.IsInRole("Project Director") || User.IsInRole("Project Manager"))
+        {
+        <div class="col-md-6 col-xl-2">
+            <label class="form-label d-block">Danh sách</label>
+            <div class="form-check">
+                @if (Model.ShowArchived)
+                {
+                    <input class="form-check-input" type="checkbox" name="ShowArchived" value="true" id="showArchived" checked />
+                }
+                else
+                {
+                    <input class="form-check-input" type="checkbox" name="ShowArchived" value="true" id="showArchived" />
+                }
+                <label class="form-check-label" for="showArchived">Đã lưu trữ</label>
+            </div>
+        </div>
+        }
+        <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Lọc</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Xóa bộ lọc</a>
+        </div>
+    </div>
+</form>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Mã</th>
+                    <th>Tiêu đề</th>
+                    <th>Dự án</th>
+                    <th>Danh mục</th>
+                    <th>Phiên bản</th>
+                    <th>Trạng thái</th>
+                    <th class="text-end">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (Model.Documents.Count == 0)
+            {
+                <tr><td colspan="7" class="text-center text-muted py-4">Không có tài liệu phù hợp.</td></tr>
+            }
+            @foreach (var document in Model.Documents)
+            {
+                <tr>
+                    <td class="text-nowrap">@document.DocumentCode</td>
+                    <td>
+                        <div class="fw-semibold">@document.Title</div>
+                        @if (document.IsArchived)
+                        {
+                            <span class="badge text-bg-secondary">Đã lưu trữ</span>
+                        }
+                    </td>
+                    <td>@(document.Project?.Name ?? (document.IsSystemWide ? "Toàn hệ thống" : "—"))</td>
+                    <td>@(document.CategoryEntity?.Name ?? document.Category)</td>
+                    <td>v@(document.CurrentVersionNumber)</td>
+                    <td>@StatusName(document.ApprovalStatus)</td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@document.Id">Chi tiết</a>
+                        @if (document.IsArchived && (User.IsInRole("Admin") || User.IsInRole("Project Director") || User.IsInRole("Project Manager")))
+                        {
+                            <form asp-action="Restore" method="post" class="d-inline" onsubmit="return confirm('Khôi phục tài liệu này?')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@document.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-success">Khôi phục</button>
+                            </form>
+                        }
+                        @if (!document.IsArchived && (User.IsInRole("Admin") || User.IsInRole("Project Director") || User.IsInRole("Project Manager")))
+                        {
+                            <form asp-action="Archive" method="post" class="d-inline-flex gap-1" onsubmit="return confirm('Lưu trữ tài liệu này?')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@document.Id" />
+                                <input class="form-control form-control-sm" name="reason" maxlength="500" required placeholder="Lý do" aria-label="Lý do lưu trữ" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Lưu trữ</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <span class="text-muted">Tổng số: @Model.TotalItems</span>
+        <nav aria-label="Phân trang tài liệu">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                    <a class="page-link" asp-action="Index" asp-route-page="@(Model.Page - 1)" asp-route-pageSize="@Model.PageSize"
+                       asp-route-keyword="@Model.Keyword" asp-route-projectId="@Model.ProjectId"
+                       asp-route-categoryId="@Model.CategoryId" asp-route-contractId="@Model.ContractId"
+                       asp-route-approvalStatus="@Model.ApprovalStatus" asp-route-uploadedById="@Model.UploadedById"
+                       asp-route-uploadedFrom="@Model.UploadedFrom?.ToString("yyyy-MM-dd")"
+                       asp-route-uploadedTo="@Model.UploadedTo?.ToString("yyyy-MM-dd")"
+                       asp-route-showArchived="@Model.ShowArchived">Trước</a>
+                </li>
+                <li class="page-item disabled"><span class="page-link">@Model.Page / @Model.TotalPages</span></li>
+                <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                    <a class="page-link" asp-action="Index" asp-route-page="@(Model.Page + 1)" asp-route-pageSize="@Model.PageSize"
+                       asp-route-keyword="@Model.Keyword" asp-route-projectId="@Model.ProjectId"
+                       asp-route-categoryId="@Model.CategoryId" asp-route-contractId="@Model.ContractId"
+                       asp-route-approvalStatus="@Model.ApprovalStatus" asp-route-uploadedById="@Model.UploadedById"
+                       asp-route-uploadedFrom="@Model.UploadedFrom?.ToString("yyyy-MM-dd")"
+                       asp-route-uploadedTo="@Model.UploadedTo?.ToString("yyyy-MM-dd")"
+                       asp-route-showArchived="@Model.ShowArchived">Sau</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</div>

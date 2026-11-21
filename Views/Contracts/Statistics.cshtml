@@ -1,0 +1,21 @@
+@model IReadOnlyCollection<ConstructionProjectManagement.Models.Contract>
+@{
+    ViewData["Title"] = "Thống kê hợp đồng";
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3">Thống kê hợp đồng</h1>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-success" asp-action="ExportExcel">Xuất Excel</a>
+        <a class="btn btn-outline-danger" asp-action="ExportPdf">Xuất PDF</a>
+    </div>
+</div>
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card card-body"><div>Tổng giá trị gốc</div><strong>@(((decimal)ViewBag.OriginalValue).ToString("N0"))</strong></div></div>
+    <div class="col-md-3"><div class="card card-body"><div>Tổng giá trị hiện tại</div><strong>@(((decimal)ViewBag.CurrentValue).ToString("N0"))</strong></div></div>
+    <div class="col-md-3"><div class="card card-body"><div>Sắp hết hạn (30 ngày)</div><strong>@ViewBag.Upcoming</strong></div></div>
+    <div class="col-md-3"><div class="card card-body"><div>Đã hết hạn</div><strong>@ViewBag.Expired</strong></div></div>
+</div>
+<div class="row g-3">
+    <div class="col-md-6"><div class="card"><div class="card-header">Theo trạng thái</div><ul class="list-group list-group-flush">@foreach (var item in (Dictionary<string,int>)ViewBag.ByStatus) { <li class="list-group-item d-flex justify-content-between"><span>@item.Key</span><strong>@item.Value</strong></li> }</ul></div></div>
+    <div class="col-md-6"><div class="card"><div class="card-header">Theo loại hợp đồng</div><ul class="list-group list-group-flush">@foreach (var item in (Dictionary<string,int>)ViewBag.ByType) { <li class="list-group-item d-flex justify-content-between"><span>@item.Key</span><strong>@item.Value</strong></li> }</ul></div></div>
+</div>
