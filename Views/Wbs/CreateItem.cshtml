@@ -1,5 +1,6 @@
 @model ConstructionProjectManagement.ViewModels.WorkItemViewModel
 @using ConstructionProjectManagement.Models
+@using ConstructionProjectManagement.ViewModels
 @{
     ViewData["Title"] = "Thêm hạng mục WBS";
     var phases = (IReadOnlyCollection<ProjectPhase>)ViewBag.Phases;
@@ -28,7 +29,7 @@
                 <option value="">-- Hạng mục gốc --</option>
                 @foreach (var item in workItems)
                 {
-                    <option value="@item.Id">@item.WbsCode - @item.Name</option>
+                    <option value="@item.Id" data-phase-id="@item.ProjectPhaseId">@item.WbsCode - @item.Name</option>
                 }
             </select>
         </div>
@@ -48,7 +49,12 @@
         </div>
         <div class="mb-3">
             <label asp-for="Status" class="form-label"></label>
-            <select asp-for="Status" asp-items="Html.GetEnumSelectList<WbsItemStatus>()" class="form-select"></select>
+            <select asp-for="Status" class="form-select">
+                @foreach (var status in Enum.GetValues<WbsItemStatus>().Where(status => status != WbsItemStatus.Archived))
+                {
+                    <option value="@status">@WbsStatusLabels.For(status)</option>
+                }
+            </select>
         </div>
         <div>
             <button type="submit" class="btn btn-primary">Lưu</button>
@@ -59,4 +65,21 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        const phaseSelect = document.getElementById("ProjectPhaseId");
+        const parentSelect = document.getElementById("ParentWorkItemId");
+        const updateParents = () => {
+            const phaseId = phaseSelect.value;
+            for (const option of parentSelect.options) {
+                if (option.value) {
+                    option.hidden = option.dataset.phaseId !== phaseId;
+                    if (option.hidden && option.selected) {
+                        parentSelect.value = "";
+                    }
+                }
+            }
+        };
+        phaseSelect.addEventListener("change", updateParents);
+        updateParents();
+    </script>
 }

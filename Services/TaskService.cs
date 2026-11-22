@@ -7,7 +7,9 @@ using TaskStatusModel = ConstructionProjectManagement.Models.TaskStatus;
 
 namespace ConstructionProjectManagement.Services;
 
-public sealed class TaskService(ApplicationDbContext dbContext) : ITaskService
+public sealed class TaskService(
+    ApplicationDbContext dbContext,
+    IWbsService wbsService) : ITaskService
 {
     public async System.Threading.Tasks.Task<IReadOnlyCollection<TaskEntity>> GetVisibleAsync(
         string userId,
@@ -34,9 +36,19 @@ public sealed class TaskService(ApplicationDbContext dbContext) : ITaskService
         IEnumerable<string> assigneeIds,
         string userId,
         bool isAdmin,
+        IReadOnlyCollection<string> roles,
         CancellationToken cancellationToken = default)
     {
-        var validationError = await ValidateAsync(task, assigneeIds, userId, isAdmin, cancellationToken);
+        var validationError = await ValidateAsync(
+            task,
+            assigneeIds,
+            userId,
+            isAdmin,
+            roles,
+            existingTaskId: null,
+            existingProjectId: null,
+            existingWorkItemId: null,
+            cancellationToken);
         if (validationError is not null)
         {
             return (false, validationError, null);
@@ -56,6 +68,7 @@ public sealed class TaskService(ApplicationDbContext dbContext) : ITaskService
         IEnumerable<string> assigneeIds,
         string userId,
         bool isAdmin,
+        IReadOnlyCollection<string> roles,
         CancellationToken cancellationToken = default)
     {
         var existing = await dbContext.Tasks
@@ -66,7 +79,16 @@ public sealed class TaskService(ApplicationDbContext dbContext) : ITaskService
             return (false, "Không tìm thấy công việc.");
         }
 
-        var validationError = await ValidateAsync(task, assigneeIds, userId, isAdmin, cancellationToken);
+        var validationError = await ValidateAsync(
+            task,
+            assigneeIds,
+            userId,
+            isAdmin,
+            roles,
+            existing.Id,
+            existing.ProjectId,
+            existing.WorkItemId,
+            cancellationToken);
         if (validationError is not null)
         {
             return (false, validationError);
@@ -119,6 +141,10 @@ public sealed class TaskService(ApplicationDbContext dbContext) : ITaskService
         IEnumerable<string> assigneeIds,
         string userId,
         bool isAdmin,
+        IReadOnlyCollection<string> roles,
+        int? existingTaskId,
+        int? existingProjectId,
+        int? existingWorkItemId,
         CancellationToken cancellationToken)
     {
         if (task.PlannedEndDate < task.PlannedStartDate)
@@ -159,6 +185,35 @@ public sealed class TaskService(ApplicationDbContext dbContext) : ITaskService
             {
                 return "WBS phải thuộc cùng dự án.";
             }
+
+            if (task.WorkItemId != existingWorkItemId)
+            {
+                var linkResult = await wbsService.CanLinkWorkItemToTaskAsync(
+                    task.ProjectId,
+                    task.WorkItemId,
+                    existingProjectId == task.ProjectId ? existingTaskId : null,
+                    userId,
+                    roles,
+                    cancellationToken);
+                if (!linkResult.Succeeded)
+                {
+                    return linkResult.Error ?? "Bạn không có quyền gắn hạng mục WBS này.";
+                }
+            }
+        }
+        else if (existingWorkItemId.HasValue)
+        {
+            var linkResult = await wbsService.CanLinkWorkItemToTaskAsync(
+                task.ProjectId,
+                null,
+                existingProjectId == task.ProjectId ? existingTaskId : null,
+                userId,
+                roles,
+                cancellationToken);
+            if (!linkResult.Succeeded)
+            {
+                return linkResult.Error ?? "Bạn không có quyền thay đổi liên kết WBS.";
+            }
         }
 
         if (task.ParentTaskId.HasValue)
@@ -172,11 +227,14 @@ public sealed class TaskService(ApplicationDbContext dbContext) : ITaskService
         }
 
         var ids = assigneeIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        var activeMemberIds = dbContext.ProjectMembers
+            .Where(member => member.ProjectId == project.Id && member.IsActive)
+            .Select(member => member.UserId);
         var eligibleIds = await dbContext.Users
             .Where(user => ids.Contains(user.Id) &&
                            user.IsActive &&
                            (user.Id == project.ProjectManagerId ||
-                            project.Members.Any(member => member.UserId == user.Id && member.IsActive)))
+                            activeMemberIds.Contains(user.Id)))
             .Select(user => user.Id)
             .ToListAsync(cancellationToken);
         return eligibleIds.Count == ids.Count

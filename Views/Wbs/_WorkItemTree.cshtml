@@ -1,0 +1,69 @@
+@model ConstructionProjectManagement.Services.WbsItemTree
+@using ConstructionProjectManagement.Models
+@using ConstructionProjectManagement.ViewModels
+@{
+    var projectId = (int)ViewData["ProjectId"]!;
+    var canManageStructure = (bool)ViewData["CanManageStructure"]!;
+    var canUpdateStatus = (bool)ViewData["CanUpdateStatus"]!;
+    var canArchiveRestore = (bool)ViewData["CanArchiveRestore"]!;
+    var item = Model.Item;
+}
+
+<li class="list-group-item">
+    <div class="d-flex justify-content-between align-items-center gap-3"
+         style="padding-left: @(Model.Depth * 1.25)rem">
+        <div class="flex-grow-1">
+            <span class="badge text-bg-primary">@item.WbsCode</span>
+            <strong class="ms-2">@item.Name</strong>
+            <span class="badge text-bg-light border ms-1">Cấp @Model.Depth</span>
+            <span class="badge text-bg-secondary ms-1">@WbsStatusLabels.For(item.Status)</span>
+            @if (item.IsArchived)
+            {
+                <span class="badge text-bg-dark ms-1">Đã lưu trữ</span>
+            }
+            <span class="small text-muted ms-2">@Model.LinkedTaskCount công việc liên kết</span>
+            @if (!string.IsNullOrWhiteSpace(item.Description))
+            {
+                <div class="small text-muted mt-1">@item.Description</div>
+            }
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            @if (canManageStructure && !item.IsArchived)
+            {
+                <a class="btn btn-sm btn-outline-primary" asp-action="EditItem" asp-route-id="@item.Id">Sửa</a>
+            }
+            @if (canUpdateStatus && !item.IsArchived)
+            {
+                <form asp-action="UpdateStatus" method="post" class="d-flex align-items-center gap-1">
+                    <input type="hidden" name="id" value="@item.Id" />
+                    <select class="form-select form-select-sm" name="status" aria-label="Trạng thái hạng mục">
+                        @foreach (var status in Enum.GetValues<WbsItemStatus>().Where(status => status != WbsItemStatus.Archived))
+                        {
+                            <option value="@status" selected="@(item.Status == status)">@WbsStatusLabels.For(status)</option>
+                        }
+                    </select>
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">Cập nhật</button>
+                </form>
+            }
+            @if (canArchiveRestore)
+            {
+                <form asp-action="@(item.IsArchived ? "RestoreItem" : "ArchiveItem")" method="post">
+                    <input type="hidden" name="id" value="@item.Id" />
+                    <input type="hidden" name="projectId" value="@projectId" />
+                    <button class="btn btn-sm @(item.IsArchived ? "btn-success" : "btn-outline-danger")" type="submit">
+                        @(item.IsArchived ? "Khôi phục" : "Lưu trữ")
+                    </button>
+                </form>
+            }
+        </div>
+    </div>
+    @if (Model.Children.Count > 0)
+    {
+        <ul class="list-group list-group-flush mt-2">
+            @foreach (var child in Model.Children)
+            {
+                @await Html.PartialAsync("_WorkItemTree", child)
+            }
+        </ul>
+    }
+</li>

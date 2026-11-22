@@ -318,36 +318,39 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        builder.Entity<ProjectPhase>()
-            .HasOne(phase => phase.Project)
-            .WithMany(project => project.Phases)
-            .HasForeignKey(phase => phase.ProjectId)
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<ProjectPhase>(entity =>
+        {
+            entity.HasOne(phase => phase.Project)
+                .WithMany(project => project.Phases)
+                .HasForeignKey(phase => phase.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(phase => new { phase.ProjectId, phase.SequenceOrder });
+            entity.HasIndex(phase => new { phase.ProjectId, phase.IsArchived });
+            entity.Property(phase => phase.Status).HasConversion<int>();
+            entity.Property(phase => phase.StatusBeforeArchive).HasConversion<int?>();
+        });
 
-        builder.Entity<ProjectPhase>()
-            .HasIndex(phase => new { phase.ProjectId, phase.SequenceOrder });
-
-        builder.Entity<WorkItem>()
-            .HasOne(item => item.Project)
-            .WithMany()
-            .HasForeignKey(item => item.ProjectId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.Entity<WorkItem>()
-            .HasOne(item => item.ProjectPhase)
-            .WithMany(phase => phase.WorkItems)
-            .HasForeignKey(item => item.ProjectPhaseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.Entity<WorkItem>()
-            .HasOne(item => item.ParentWorkItem)
-            .WithMany(item => item.Children)
-            .HasForeignKey(item => item.ParentWorkItemId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.Entity<WorkItem>()
-            .HasIndex(item => new { item.ProjectId, item.WbsCode })
-            .IsUnique();
+        builder.Entity<WorkItem>(entity =>
+        {
+            entity.HasOne(item => item.Project)
+                .WithMany()
+                .HasForeignKey(item => item.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ProjectPhase)
+                .WithMany(phase => phase.WorkItems)
+                .HasForeignKey(item => item.ProjectPhaseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ParentWorkItem)
+                .WithMany(item => item.Children)
+                .HasForeignKey(item => item.ParentWorkItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(item => item.WbsCode).UseCollation("NOCASE");
+            entity.Property(item => item.Status).HasConversion<int>();
+            entity.Property(item => item.StatusBeforeArchive).HasConversion<int?>();
+            entity.HasIndex(item => new { item.ProjectId, item.WbsCode }).IsUnique();
+            entity.HasIndex(item => new { item.ProjectId, item.IsArchived });
+            entity.ToTable(table => table.HasCheckConstraint("CK_WorkItems_Level", "\"Level\" >= 1"));
+        });
 
         builder.Entity<TaskEntity>()
             .Property(task => task.PercentComplete)

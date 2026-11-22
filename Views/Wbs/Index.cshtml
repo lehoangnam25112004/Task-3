@@ -1,38 +1,99 @@
 @model ConstructionProjectManagement.ViewModels.WbsIndexViewModel
 @using ConstructionProjectManagement.Models
+@using ConstructionProjectManagement.ViewModels
 @{
     ViewData["Title"] = "Cấu trúc WBS";
+    ViewData["ProjectId"] = Model.Tree.Project.Id;
+    ViewData["CanManageStructure"] = Model.CanManageStructure;
+    ViewData["CanUpdateStatus"] = Model.CanUpdateStatus;
+    ViewData["CanArchiveRestore"] = Model.CanArchiveRestore;
+}
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success" role="status">@successMessage</div>
+}
+@if (TempData["WarningMessage"] is string warningMessage)
+{
+    <div class="alert alert-warning" role="alert">@warningMessage</div>
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
         <h1 class="h3 mb-1">Cấu trúc WBS</h1>
-        <p class="text-muted mb-0">@Model.Project.ProjectCode - @Model.Project.Name</p>
+        <p class="text-muted mb-0">@Model.Tree.Project.ProjectCode - @Model.Tree.Project.Name</p>
+        @if (Model.Tree.IsReadOnly)
+        {
+            <span class="badge text-bg-secondary mt-2">Dự án chỉ đọc</span>
+        }
     </div>
-    @if (User.IsInRole("Admin") || User.IsInRole("Project Director") || User.IsInRole("Project Manager"))
+    @if (Model.CanManageStructure)
     {
         <div>
-            <a class="btn btn-outline-primary" asp-action="CreatePhase" asp-route-projectId="@Model.Project.Id">Thêm giai đoạn</a>
-            <a class="btn btn-primary" asp-action="CreateItem" asp-route-projectId="@Model.Project.Id">Thêm hạng mục</a>
+            <a class="btn btn-outline-primary" asp-action="CreatePhase" asp-route-projectId="@Model.Tree.Project.Id">Thêm giai đoạn</a>
+            <a class="btn btn-primary" asp-action="CreateItem" asp-route-projectId="@Model.Tree.Project.Id">Thêm hạng mục</a>
         </div>
     }
 </div>
 
-@foreach (var phase in Model.Project.Phases)
+@if (Model.CanArchiveRestore)
 {
-    <div class="card mb-3">
-        <div class="card-header fw-bold">
-            Giai đoạn @phase.SequenceOrder: @phase.Name
-            <span class="badge text-bg-secondary float-end">@phase.Status</span>
-        </div>
-        <div class="list-group list-group-flush">
-        @foreach (var item in phase.WorkItems.OrderBy(workItem => workItem.SequenceOrder))
-        {
-            <div class="list-group-item" style="padding-left: @($"{1 + item.Level * 1.5}rem")">
-                <strong>@item.WbsCode</strong> — @item.Name
-                <span class="badge text-bg-light float-end">@item.Status</span>
+    <form asp-action="Index" method="get" class="form-check form-switch mb-3">
+        <input type="hidden" name="projectId" value="@Model.Tree.Project.Id" />
+        <input class="form-check-input" type="checkbox" role="switch" id="includeArchived"
+               name="includeArchived" value="true" checked="@Model.IncludeArchived"
+               onchange="this.form.submit()" />
+        <label class="form-check-label" for="includeArchived">Hiển thị mục đã lưu trữ</label>
+    </form>
+}
+
+@if (Model.Tree.Phases.Count == 0)
+{
+    <div class="alert alert-info">Dự án chưa có giai đoạn WBS phù hợp với bộ lọc hiện tại.</div>
+}
+
+@foreach (var phaseTree in Model.Tree.Phases)
+{
+    var phase = phaseTree.Phase;
+    <section class="card mb-3">
+        <header class="card-header d-flex justify-content-between align-items-center gap-3">
+            <div>
+                <strong>Giai đoạn @phase.SequenceOrder: @phase.Name</strong>
+                <span class="badge text-bg-secondary ms-2">@WbsStatusLabels.For(phase.Status)</span>
+                @if (phase.IsArchived)
+                {
+                    <span class="badge text-bg-dark ms-1">Đã lưu trữ</span>
+                }
             </div>
+            <div class="d-flex gap-2">
+                @if (Model.CanManageStructure && !phase.IsArchived)
+                {
+                    <a class="btn btn-sm btn-outline-primary" asp-action="EditPhase" asp-route-id="@phase.Id">Sửa</a>
+                }
+                @if (Model.CanArchiveRestore)
+                {
+                    <form asp-action="@(phase.IsArchived ? "RestorePhase" : "ArchivePhase")" method="post">
+                        <input type="hidden" name="id" value="@phase.Id" />
+                        <input type="hidden" name="projectId" value="@Model.Tree.Project.Id" />
+                        <button class="btn btn-sm @(phase.IsArchived ? "btn-success" : "btn-outline-danger")" type="submit">
+                            @(phase.IsArchived ? "Khôi phục giai đoạn" : "Lưu trữ giai đoạn")
+                        </button>
+                    </form>
+                }
+            </div>
+        </header>
+        @if (phaseTree.RootItems.Count == 0)
+        {
+            <div class="card-body text-muted">Chưa có hạng mục trong giai đoạn này.</div>
         }
-        </div>
-    </div>
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var node in phaseTree.RootItems)
+                {
+                    @await Html.PartialAsync("_WorkItemTree", node)
+                }
+            </ul>
+        }
+    </section>
 }

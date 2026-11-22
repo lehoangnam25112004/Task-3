@@ -15,8 +15,18 @@ public class ProjectPhase
 
     public int SequenceOrder { get; set; }
 
-    [MaxLength(30)]
-    public string Status { get; set; } = "Planned";
+    public ProjectPhaseStatus Status { get; set; } = ProjectPhaseStatus.NotStarted;
+
+    public bool IsArchived { get; set; }
+
+    public DateTime? ArchivedAt { get; set; }
+
+    [MaxLength(450)]
+    public string? ArchivedByUserId { get; set; }
+
+    public ProjectPhaseStatus? StatusBeforeArchive { get; set; }
+
+    public Guid? ArchiveGroupId { get; set; }
 
     public ICollection<WorkItem> WorkItems { get; set; } = [];
 }

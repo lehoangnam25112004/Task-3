@@ -2,8 +2,9 @@ namespace ConstructionProjectManagement.Models;
 
 public enum WbsItemStatus
 {
-    Planned,
-    InProgress,
-    Completed,
-    OnHold
+    NotStarted = 0,
+    InProgress = 1,
+    Completed = 2,
+    OnHold = 3,
+    Archived = 4
 }

@@ -7,16 +7,26 @@
     var workItems = (IReadOnlyCollection<WorkItem>)ViewBag.WorkItems;
     var tasks = (IReadOnlyCollection<TaskEntity>)ViewBag.Tasks;
     var users = (IReadOnlyCollection<ApplicationUser>)ViewBag.Users;
+    var canLinkWbs = (bool)ViewBag.CanLinkWbs;
 }
 
 <form asp-action="@(Model.Id is null ? "Create" : "Edit")" asp-route-id="@Model.Id" method="post">
     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+    @if (ViewBag.WbsMessage is string wbsMessage)
+    {
+        <div class="alert alert-warning" role="status">@wbsMessage</div>
+    }
+    @if (Model.ProjectId == 0)
+    {
+        <div class="form-text mb-3">Chọn dự án để nạp các hạng mục WBS đang hoạt động của chính dự án đó.</div>
+    }
     <div class="card">
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-6">
                     <label asp-for="ProjectId" class="form-label"></label>
-                    <select asp-for="ProjectId" class="form-select">
+                    <select asp-for="ProjectId" class="form-select" id="taskProjectSelect"
+                            data-reload-url="@(Model.Id is null ? Url.Action("Create") : Url.Action("Edit", new { id = Model.Id }))">
                         <option value="">-- Chọn dự án --</option>
                         @foreach (var project in projects)
                         {
@@ -31,13 +41,31 @@
                 </div>
                 <div class="col-md-6">
                     <label asp-for="WorkItemId" class="form-label"></label>
-                    <select asp-for="WorkItemId" class="form-select">
-                        <option value="">-- Không gắn WBS --</option>
-                        @foreach (var item in workItems)
-                        {
-                            <option value="@item.Id">@item.WbsCode - @item.Name</option>
-                        }
-                    </select>
+                    @if (canLinkWbs)
+                    {
+                        <select asp-for="WorkItemId" class="form-select">
+                            <option value="">-- Không gắn WBS --</option>
+                            @foreach (var item in workItems)
+                            {
+                                <option value="@item.Id" selected="@(Model.WorkItemId == item.Id)">
+                                    @item.WbsCode - @item.Name @(item.IsArchived ? "(Đã lưu trữ - liên kết hiện tại)" : string.Empty)
+                                </option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input asp-for="WorkItemId" type="hidden" />
+                        <select class="form-select" disabled aria-label="WBS hiện được liên kết">
+                            <option value="">-- Không thể thay đổi liên kết WBS --</option>
+                            @foreach (var item in workItems)
+                            {
+                                <option value="@item.Id" selected="@(Model.WorkItemId == item.Id)">
+                                    @item.WbsCode - @item.Name @(item.IsArchived ? "(Đã lưu trữ - liên kết hiện tại)" : string.Empty)
+                                </option>
+                            }
+                        </select>
+                    }
                 </div>
                 <div class="col-md-6">
                     <label asp-for="ParentTaskId" class="form-label"></label>
@@ -108,4 +136,19 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.getElementById("taskProjectSelect").addEventListener("change", event => {
+            const projectId = event.target.value;
+            if (!projectId) {
+                return;
+            }
+            if (!window.confirm("Đổi dự án sẽ tải lại biểu mẫu và làm mất nội dung chưa lưu. Bạn có muốn tiếp tục không?")) {
+                event.target.value = "@Model.ProjectId";
+                return;
+            }
+            const url = new URL(event.target.dataset.reloadUrl, window.location.origin);
+            url.searchParams.set("projectId", projectId);
+            window.location.assign(url);
+        });
+    </script>
 }

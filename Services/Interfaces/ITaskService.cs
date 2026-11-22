@@ -21,6 +21,7 @@ public interface ITaskService
         IEnumerable<string> assigneeIds,
         string userId,
         bool isAdmin,
+        IReadOnlyCollection<string> roles,
         CancellationToken cancellationToken = default);
 
     System.Threading.Tasks.Task<(bool Succeeded, string? Error)> UpdateAsync(
@@ -28,5 +29,6 @@ public interface ITaskService
         IEnumerable<string> assigneeIds,
         string userId,
         bool isAdmin,
+        IReadOnlyCollection<string> roles,
         CancellationToken cancellationToken = default);
 }
